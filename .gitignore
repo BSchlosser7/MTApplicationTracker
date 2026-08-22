@@ -32,9 +32,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
 
 # vercel
 .vercel
+
+# legacy local SQLite data (superseded by Supabase, kept until migrated)
+/data/
+/uploads/
 
 # typescript
 *.tsbuildinfo

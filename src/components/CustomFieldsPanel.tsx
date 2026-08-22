@@ -1,0 +1,132 @@
+"use client";
+
+import { useState } from "react";
+import useSWR, { mutate } from "swr";
+import type { CustomField, CustomFieldValue } from "@/lib/types";
+import { fetcher } from "@/lib/fetcher";
+import AddFieldForm from "@/components/AddFieldForm";
+
+export default function CustomFieldsPanel({ schoolId }: { schoolId: string }) {
+  const fieldsKey = "/api/fields";
+  const valuesKey = `/api/field-values?schoolId=${schoolId}`;
+  const { data: fields } = useSWR<CustomField[]>(fieldsKey, fetcher);
+  const { data: values } = useSWR<CustomFieldValue[]>(valuesKey, fetcher);
+
+  const [adding, setAdding] = useState(false);
+
+  if (!fields || !values) {
+    return <p className="text-sm text-zinc-500">Loading…</p>;
+  }
+
+  const valueMap = new Map(values.map((v) => [v.fieldId, v.value ?? ""]));
+
+  async function handleDelete(fieldId: string, label: string) {
+    if (!confirm(`Delete the "${label}" field? This removes its value on every school.`)) {
+      return;
+    }
+    await fetch(`/api/fields/${fieldId}`, { method: "DELETE" });
+    mutate(fieldsKey);
+    mutate(valuesKey);
+    mutate("/api/field-values");
+  }
+
+  return (
+    <div className="space-y-4">
+      {fields.length === 0 && !adding && (
+        <p className="text-sm text-zinc-500">
+          No custom fields yet. Add one to start tracking anything not already on this
+          page.
+        </p>
+      )}
+
+      {fields.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {fields.map((field) => (
+            <FieldInput
+              key={field.id}
+              field={field}
+              value={valueMap.get(field.id) ?? ""}
+              schoolId={schoolId}
+              valuesKey={valuesKey}
+              onDelete={() => handleDelete(field.id, field.label)}
+            />
+          ))}
+        </div>
+      )}
+
+      {adding ? (
+        <AddFieldForm
+          onDone={() => setAdding(false)}
+          onCreated={() => mutate(fieldsKey)}
+        />
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:underline"
+        >
+          + Add Field
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FieldInput({
+  field,
+  value,
+  schoolId,
+  valuesKey,
+  onDelete,
+}: {
+  field: CustomField;
+  value: string;
+  schoolId: string;
+  valuesKey: string;
+  onDelete: () => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  async function commit() {
+    if (draft === value) return;
+    await fetch("/api/field-values", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ schoolId, fieldId: field.id, value: draft }),
+    });
+    mutate(valuesKey);
+    mutate("/api/field-values");
+  }
+
+  return (
+    <label className="block">
+      <span className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-xs font-medium text-zinc-500">{field.label}</span>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="text-xs text-zinc-300 hover:text-red-600 dark:text-zinc-700 dark:hover:text-red-400"
+          title="Delete field"
+        >
+          ×
+        </button>
+      </span>
+      {field.type === "longtext" ? (
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          rows={3}
+          className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm resize-y"
+        />
+      ) : (
+        <input
+          type={field.type === "date" ? "date" : field.type === "url" ? "url" : "text"}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
+        />
+      )}
+    </label>
+  );
+}
