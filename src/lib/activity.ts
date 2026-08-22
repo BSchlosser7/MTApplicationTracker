@@ -33,6 +33,15 @@ export async function listActivity(schoolId: string): Promise<ActivityRow[]> {
   return (data as Row[]).map(mapRow);
 }
 
+export async function listAllActivity(): Promise<ActivityRow[]> {
+  const { data, error } = await supabase
+    .from("activity_log")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as Row[]).map(mapRow);
+}
+
 export async function logStatusChange(
   schoolId: string,
   fromStatus: string | null,

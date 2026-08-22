@@ -39,7 +39,17 @@ export default function Nav() {
             );
           })}
         </nav>
-        <DeadlineNotifier />
+        <div className="flex items-center gap-1 shrink-0">
+          <a
+            href="/api/export"
+            download
+            title="Download a backup of all schools, fields, notes, and document info"
+            className="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+          >
+            Backup
+          </a>
+          <DeadlineNotifier />
+        </div>
       </div>
     </header>
   );

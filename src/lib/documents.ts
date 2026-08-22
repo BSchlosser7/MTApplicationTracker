@@ -39,6 +39,15 @@ export async function listDocuments(schoolId: string): Promise<DocumentRow[]> {
   return (data as Row[]).map(mapRow);
 }
 
+export async function listAllDocuments(): Promise<DocumentRow[]> {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("*")
+    .order("uploaded_at", { ascending: false });
+  if (error) throw error;
+  return (data as Row[]).map(mapRow);
+}
+
 export async function getDocument(id: string): Promise<DocumentRow | undefined> {
   const { data, error } = await supabase
     .from("documents")
