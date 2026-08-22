@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 export default function NewSchoolPage() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +18,7 @@ export default function NewSchoolPage() {
       const res = await fetch("/api/schools", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), website: website.trim() || null }),
+        body: JSON.stringify({ name: name.trim() }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Failed to create");
       const school = await res.json();
@@ -41,15 +40,6 @@ export default function NewSchoolPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Carnegie Mellon University"
-            className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Website (optional)</label>
-          <input
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            placeholder="https://…"
             className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
           />
         </div>

@@ -4,7 +4,7 @@ import { useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import type { School, DocumentRow, ActivityRow } from "@/lib/types";
-import { STATUS_OPTIONS, REQUIREMENT_FIELDS } from "@/lib/types";
+import { STATUS_OPTIONS } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import StatusBadge from "@/components/StatusBadge";
 import DocumentsPanel from "@/components/DocumentsPanel";
@@ -67,14 +67,6 @@ export default function SchoolDetailPage({
     router.push("/schools");
   }
 
-  function dateInputValue(iso: string | null) {
-    return iso ? iso.slice(0, 10) : "";
-  }
-
-  function fromDateInput(value: string): string | null {
-    return value || null;
-  }
-
   return (
     <div className="space-y-8 max-w-4xl">
       <div className="flex items-start justify-between gap-4">
@@ -83,12 +75,6 @@ export default function SchoolDetailPage({
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
             className="text-xl font-semibold bg-transparent w-full focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 rounded px-1 -mx-1"
-          />
-          <input
-            value={form.website ?? ""}
-            onChange={(e) => set("website", e.target.value)}
-            placeholder="Website URL"
-            className="text-sm text-zinc-500 bg-transparent w-full mt-1 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 rounded px-1 -mx-1"
           />
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -129,42 +115,10 @@ export default function SchoolDetailPage({
             ))}
           </select>
         </Field>
-        <Field label="Prescreen Deadline">
-          <input
-            type="date"
-            value={dateInputValue(form.prescreenDeadline)}
-            onChange={(e) => set("prescreenDeadline", fromDateInput(e.target.value))}
-            className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
-          />
-        </Field>
-        <Field label="Application Deadline">
-          <input
-            type="date"
-            value={dateInputValue(form.applicationDeadline)}
-            onChange={(e) => set("applicationDeadline", fromDateInput(e.target.value))}
-            className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
-          />
-        </Field>
       </section>
 
       <section>
-        <h2 className="font-medium text-sm mb-3">Audition & Application Requirements</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {REQUIREMENT_FIELDS.map(({ key, label }) => (
-            <Field key={key} label={label}>
-              <textarea
-                value={(form[key] as string) ?? ""}
-                onChange={(e) => set(key, e.target.value as School[typeof key])}
-                rows={label.includes("Notes") || label.includes("Prompts") ? 4 : 2}
-                className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm resize-y"
-              />
-            </Field>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="font-medium text-sm mb-3">Custom Fields</h2>
+        <h2 className="font-medium text-sm mb-3">Fields</h2>
         <CustomFieldsPanel schoolId={id} />
       </section>
 

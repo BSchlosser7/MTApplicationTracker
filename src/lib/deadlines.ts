@@ -1,43 +1,38 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import type { School } from "./types";
+import type { CustomField, CustomFieldValue, School } from "./types";
 
 export interface DeadlineEntry {
   schoolId: string;
   schoolName: string;
-  type: "Application" | "Prescreen";
+  type: string;
   date: string;
   daysUntil: number;
 }
 
-export function extractDeadlines(schools: School[]): DeadlineEntry[] {
+export function extractDeadlines(
+  schools: School[],
+  fields: CustomField[],
+  values: CustomFieldValue[]
+): DeadlineEntry[] {
   const today = new Date();
-  const entries: DeadlineEntry[] = [];
+  const dateFields = new Map(
+    fields.filter((f) => f.type === "date").map((f) => [f.id, f.label])
+  );
+  const schoolNames = new Map(schools.map((s) => [s.id, s.name]));
 
-  for (const s of schools) {
-    if (s.applicationDeadline) {
-      entries.push({
-        schoolId: s.id,
-        schoolName: s.name,
-        type: "Application",
-        date: s.applicationDeadline,
-        daysUntil: differenceInCalendarDays(
-          parseISO(s.applicationDeadline),
-          today
-        ),
-      });
-    }
-    if (s.prescreenDeadline) {
-      entries.push({
-        schoolId: s.id,
-        schoolName: s.name,
-        type: "Prescreen",
-        date: s.prescreenDeadline,
-        daysUntil: differenceInCalendarDays(
-          parseISO(s.prescreenDeadline),
-          today
-        ),
-      });
-    }
+  const entries: DeadlineEntry[] = [];
+  for (const v of values) {
+    if (!v.value) continue;
+    const label = dateFields.get(v.fieldId);
+    const schoolName = schoolNames.get(v.schoolId);
+    if (!label || !schoolName) continue;
+    entries.push({
+      schoolId: v.schoolId,
+      schoolName,
+      type: label,
+      date: v.value,
+      daysUntil: differenceInCalendarDays(parseISO(v.value), today),
+    });
   }
 
   return entries.sort((a, b) => a.date.localeCompare(b.date));
@@ -45,20 +40,26 @@ export function extractDeadlines(schools: School[]): DeadlineEntry[] {
 
 export function upcomingDeadlines(
   schools: School[],
+  fields: CustomField[],
+  values: CustomFieldValue[],
   withinDays = 14
 ): DeadlineEntry[] {
-  return extractDeadlines(schools).filter(
+  return extractDeadlines(schools, fields, values).filter(
     (d) => d.daysUntil >= 0 && d.daysUntil <= withinDays
   );
 }
 
-export function overdueDeadlines(schools: School[]): DeadlineEntry[] {
+export function overdueDeadlines(
+  schools: School[],
+  fields: CustomField[],
+  values: CustomFieldValue[]
+): DeadlineEntry[] {
   const activeStatuses = new Set([
     "Not Started",
     "Researching",
     "In Progress",
   ]);
-  return extractDeadlines(schools).filter((d) => {
+  return extractDeadlines(schools, fields, values).filter((d) => {
     if (d.daysUntil >= 0) return false;
     const school = schools.find((s) => s.id === d.schoolId);
     return school ? activeStatuses.has(school.status) : false;

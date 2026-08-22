@@ -18,24 +18,12 @@ interface ColumnDef {
   fieldId?: string;
 }
 
-const BUILTIN_COLUMNS: ColumnDef[] = [
-  { key: "status", label: "Status", type: "status", width: "w-44" },
-  { key: "website", label: "Website", type: "link", width: "w-48" },
-  { key: "prescreenDeadline", label: "Prescreen Deadline", type: "date", width: "w-40" },
-  { key: "applicationDeadline", label: "Application Deadline", type: "date", width: "w-40" },
-  { key: "howToApply", label: "How to Apply", type: "longtext", width: "w-72" },
-  { key: "songRequirements", label: "Song Requirements", type: "longtext", width: "w-72" },
-  { key: "actingRequirements", label: "Acting Requirements", type: "longtext", width: "w-72" },
-  { key: "danceRequirements", label: "Dance Requirements", type: "longtext", width: "w-72" },
-  { key: "wildCardRequirements", label: "Wild Card Requirements", type: "longtext", width: "w-72" },
-  { key: "filmingNotes", label: "Notes on How to Film", type: "longtext", width: "w-72" },
-  { key: "actingVideoLength", label: "Acting Video Length", type: "text", width: "w-36" },
-  { key: "songVideoLength", label: "Song Video Length", type: "text", width: "w-36" },
-  { key: "danceVideoLength", label: "Dance Video Length", type: "text", width: "w-36" },
-  { key: "slateRequirements", label: "Slate Requirements", type: "longtext", width: "w-72" },
-  { key: "essayPrompts", label: "Essay Prompts", type: "longtext", width: "w-72" },
-  { key: "generalNotes", label: "General Notes", type: "longtext", width: "w-72" },
-];
+const STATUS_COLUMN: ColumnDef = {
+  key: "status",
+  label: "Status",
+  type: "status",
+  width: "w-44",
+};
 
 const CUSTOM_TYPE_TO_COLUMN_TYPE: Record<string, ColumnType> = {
   text: "text",
@@ -103,7 +91,7 @@ export default function TablePage() {
   );
 
   const allColumns = useMemo(
-    () => [...BUILTIN_COLUMNS, ...customColumns],
+    () => [STATUS_COLUMN, ...customColumns],
     [customColumns]
   );
 
@@ -207,26 +195,16 @@ export default function TablePage() {
                   Hide all
                 </button>
               </div>
-              {BUILTIN_COLUMNS.map((c) => (
-                <label
-                  key={c.key}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={!hidden.has(c.key)}
-                    onChange={() => toggleColumn(c.key)}
-                  />
-                  {c.label}
-                </label>
-              ))}
-
-              <div className="px-3 pt-2 mt-1 border-t border-zinc-100 dark:border-zinc-900 text-xs font-semibold text-zinc-500 uppercase tracking-wide">
-                Custom Fields
-              </div>
-              {customColumns.length === 0 && !addingField && (
-                <p className="px-3 py-1.5 text-xs text-zinc-400">None yet</p>
-              )}
+              <label
+                className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={!hidden.has(STATUS_COLUMN.key)}
+                  onChange={() => toggleColumn(STATUS_COLUMN.key)}
+                />
+                {STATUS_COLUMN.label}
+              </label>
               {customColumns.map((c) => (
                 <div
                   key={c.key}
@@ -250,7 +228,7 @@ export default function TablePage() {
                 </div>
               ))}
 
-              <div className="px-3 pt-2">
+              <div className="px-3 pt-2 mt-1 border-t border-zinc-100 dark:border-zinc-900">
                 {addingField ? (
                   <AddFieldForm
                     onDone={() => setAddingField(false)}

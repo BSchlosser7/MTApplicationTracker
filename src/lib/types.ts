@@ -26,22 +26,7 @@ export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 export interface School {
   id: string;
   name: string;
-  website: string | null;
   status: Status;
-  applicationDeadline: string | null;
-  prescreenDeadline: string | null;
-  howToApply: string | null;
-  songRequirements: string | null;
-  actingRequirements: string | null;
-  danceRequirements: string | null;
-  wildCardRequirements: string | null;
-  filmingNotes: string | null;
-  actingVideoLength: string | null;
-  songVideoLength: string | null;
-  danceVideoLength: string | null;
-  slateRequirements: string | null;
-  essayPrompts: string | null;
-  generalNotes: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -93,18 +78,3 @@ export interface CustomFieldValue {
   value: string | null;
   updatedAt: string;
 }
-
-export const REQUIREMENT_FIELDS: { key: keyof School; label: string }[] = [
-  { key: "howToApply", label: "How to Apply" },
-  { key: "songRequirements", label: "Song Requirements" },
-  { key: "actingRequirements", label: "Acting Requirements" },
-  { key: "danceRequirements", label: "Dance Requirements" },
-  { key: "wildCardRequirements", label: "Wild Card Requirements" },
-  { key: "filmingNotes", label: "Notes on How to Film" },
-  { key: "actingVideoLength", label: "Acting Video Length" },
-  { key: "songVideoLength", label: "Song Video Length" },
-  { key: "danceVideoLength", label: "Dance Video Length" },
-  { key: "slateRequirements", label: "Slate Requirements" },
-  { key: "essayPrompts", label: "Essay Prompts" },
-  { key: "generalNotes", label: "General Notes" },
-];

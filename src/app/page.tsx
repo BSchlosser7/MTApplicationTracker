@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import useSWR from "swr";
-import type { School } from "@/lib/types";
+import type { CustomField, CustomFieldValue, School } from "@/lib/types";
 import { STATUS_OPTIONS } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import { extractDeadlines, overdueDeadlines } from "@/lib/deadlines";
@@ -14,13 +14,20 @@ export default function DashboardPage() {
     "/api/schools",
     fetcher
   );
+  const { data: fields } = useSWR<CustomField[]>("/api/fields", fetcher);
+  const { data: values } = useSWR<CustomFieldValue[]>(
+    "/api/field-values",
+    fetcher
+  );
 
-  if (isLoading || !schools) {
+  if (isLoading || !schools || !fields || !values) {
     return <div className="text-sm text-zinc-500">Loading…</div>;
   }
 
-  const deadlines = extractDeadlines(schools).filter((d) => d.daysUntil >= 0);
-  const overdue = overdueDeadlines(schools);
+  const deadlines = extractDeadlines(schools, fields, values).filter(
+    (d) => d.daysUntil >= 0
+  );
+  const overdue = overdueDeadlines(schools, fields, values);
   const nextDeadlines = deadlines.slice(0, 6);
 
   const activeCount = schools.filter((s) =>

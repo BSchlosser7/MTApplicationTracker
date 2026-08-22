@@ -3,20 +3,36 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import type { School, Status } from "@/lib/types";
+import type { CustomField, CustomFieldValue, School, Status } from "@/lib/types";
 import { STATUS_OPTIONS } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import StatusBadge from "@/components/StatusBadge";
 import DeadlinePill from "@/components/DeadlinePill";
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { extractDeadlines } from "@/lib/deadlines";
 
 export default function SchoolsPage() {
   const { data: schools, isLoading } = useSWR<School[]>(
     "/api/schools",
     fetcher
   );
+  const { data: fields } = useSWR<CustomField[]>("/api/fields", fetcher);
+  const { data: values } = useSWR<CustomFieldValue[]>(
+    "/api/field-values",
+    fetcher
+  );
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
+
+  const deadlinesBySchool = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof extractDeadlines>>();
+    if (!schools || !fields || !values) return m;
+    for (const d of extractDeadlines(schools, fields, values)) {
+      const arr = m.get(d.schoolId) ?? [];
+      arr.push(d);
+      m.set(d.schoolId, arr);
+    }
+    return m;
+  }, [schools, fields, values]);
 
   const filtered = useMemo(() => {
     if (!schools) return [];
@@ -67,13 +83,7 @@ export default function SchoolsPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((s) => {
-            const today = new Date();
-            const appDays = s.applicationDeadline
-              ? differenceInCalendarDays(parseISO(s.applicationDeadline), today)
-              : null;
-            const preDays = s.prescreenDeadline
-              ? differenceInCalendarDays(parseISO(s.prescreenDeadline), today)
-              : null;
+            const deadlines = deadlinesBySchool.get(s.id) ?? [];
             return (
               <Link
                 key={s.id}
@@ -85,13 +95,13 @@ export default function SchoolsPage() {
                   <StatusBadge status={s.status} />
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {s.prescreenDeadline && preDays !== null && (
-                    <DeadlinePill date={s.prescreenDeadline} daysUntil={preDays} />
-                  )}
-                  {s.applicationDeadline && appDays !== null && (
-                    <DeadlinePill date={s.applicationDeadline} daysUntil={appDays} />
-                  )}
-                  {!s.applicationDeadline && !s.prescreenDeadline && (
+                  {deadlines.map((d) => (
+                    <span key={d.type} className="inline-flex items-center gap-1">
+                      <span className="text-[10px] text-zinc-400">{d.type}</span>
+                      <DeadlinePill date={d.date} daysUntil={d.daysUntil} />
+                    </span>
+                  ))}
+                  {deadlines.length === 0 && (
                     <span className="text-xs text-zinc-400">No deadlines entered</span>
                   )}
                 </div>

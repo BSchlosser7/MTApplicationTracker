@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import type { School } from "@/lib/types";
+import type { CustomField, CustomFieldValue, School } from "@/lib/types";
 import { upcomingDeadlines, overdueDeadlines } from "@/lib/deadlines";
 import { fetcher } from "@/lib/fetcher";
 
@@ -28,6 +28,14 @@ export default function DeadlineNotifier() {
   const { data: schools } = useSWR<School[]>("/api/schools", fetcher, {
     refreshInterval: 60_000,
   });
+  const { data: fields } = useSWR<CustomField[]>("/api/fields", fetcher, {
+    refreshInterval: 60_000,
+  });
+  const { data: values } = useSWR<CustomFieldValue[]>(
+    "/api/field-values",
+    fetcher,
+    { refreshInterval: 60_000 }
+  );
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const askedRef = useRef(false);
@@ -43,12 +51,12 @@ export default function DeadlineNotifier() {
   }, []);
 
   useEffect(() => {
-    if (!schools || askedRef.current) return;
+    if (!schools || !fields || !values || askedRef.current) return;
     askedRef.current = true;
 
     if (typeof window === "undefined" || !("Notification" in window)) return;
 
-    const urgent = upcomingDeadlines(schools, 3);
+    const urgent = upcomingDeadlines(schools, fields, values, 3);
     if (urgent.length === 0) return;
 
     const notified = getNotified();
@@ -80,13 +88,13 @@ export default function DeadlineNotifier() {
         list.map((d) => `${d.schoolId}-${d.type}-${d.date}-${todayKeyPrefix}`)
       );
     }
-  }, [schools]);
+  }, [schools, fields, values]);
 
-  if (!schools) return null;
+  if (!schools || !fields || !values) return null;
 
-  const upcoming = upcomingDeadlines(schools, 14);
-  const overdue = overdueDeadlines(schools);
-  const urgentCount = upcomingDeadlines(schools, 3).length + overdue.length;
+  const upcoming = upcomingDeadlines(schools, fields, values, 14);
+  const overdue = overdueDeadlines(schools, fields, values);
+  const urgentCount = upcomingDeadlines(schools, fields, values, 3).length + overdue.length;
 
   return (
     <div className="relative" ref={containerRef}>

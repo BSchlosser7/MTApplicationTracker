@@ -17,7 +17,7 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
-import type { School } from "@/lib/types";
+import type { CustomField, CustomFieldValue, School } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import { extractDeadlines, type DeadlineEntry } from "@/lib/deadlines";
 import DeadlinePill from "@/components/DeadlinePill";
@@ -26,12 +26,17 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function CalendarPage() {
   const { data: schools } = useSWR<School[]>("/api/schools", fetcher);
+  const { data: fields } = useSWR<CustomField[]>("/api/fields", fetcher);
+  const { data: values } = useSWR<CustomFieldValue[]>(
+    "/api/field-values",
+    fetcher
+  );
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [view, setView] = useState<"month" | "list">("month");
 
   const deadlines = useMemo(
-    () => (schools ? extractDeadlines(schools) : []),
-    [schools]
+    () => (schools && fields && values ? extractDeadlines(schools, fields, values) : []),
+    [schools, fields, values]
   );
 
   const days = useMemo(() => {
