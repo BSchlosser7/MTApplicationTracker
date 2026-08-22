@@ -7,14 +7,14 @@ import type { School, CustomField, CustomFieldValue } from "@/lib/types";
 import { STATUS_OPTIONS } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import AddFieldForm from "@/components/AddFieldForm";
+import { parseDateRangeValue, serializeDateRangeValue } from "@/lib/dateRange";
 
-type ColumnType = "status" | "date" | "link" | "text" | "longtext";
+type ColumnType = "status" | "date" | "daterange" | "link" | "text" | "longtext";
 
 interface ColumnDef {
   key: string;
   label: string;
   type: ColumnType;
-  width: string;
   fieldId?: string;
 }
 
@@ -22,24 +22,28 @@ const STATUS_COLUMN: ColumnDef = {
   key: "status",
   label: "Status",
   type: "status",
-  width: "w-44",
 };
 
 const CUSTOM_TYPE_TO_COLUMN_TYPE: Record<string, ColumnType> = {
   text: "text",
   longtext: "longtext",
   date: "date",
+  daterange: "daterange",
   url: "link",
 };
 
-const CUSTOM_TYPE_WIDTH: Record<string, string> = {
-  text: "w-40",
-  longtext: "w-72",
-  date: "w-40",
-  url: "w-48",
+const DEFAULT_WIDTH: Record<ColumnType, number> = {
+  status: 176,
+  date: 160,
+  daterange: 230,
+  link: 192,
+  text: 160,
+  longtext: 288,
 };
 
-const STORAGE_KEY = "mt-tracker-table-hidden-columns";
+const MIN_WIDTH = 90;
+const HIDDEN_STORAGE_KEY = "mt-tracker-table-hidden-columns";
+const WIDTH_STORAGE_KEY = "mt-tracker-table-column-widths";
 
 export default function TablePage() {
   const { data: schools, isLoading } = useSWR<School[]>("/api/schools", fetcher);
@@ -52,6 +56,7 @@ export default function TablePage() {
   // Start with the same "everything visible" default on server and client so
   // hydration matches, then sync the persisted preference in after mount.
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [addingField, setAddingField] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -59,9 +64,15 @@ export default function TablePage() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(HIDDEN_STORAGE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from localStorage on mount, after hydration
       if (stored) setHidden(new Set(JSON.parse(stored)));
+    } catch {
+      // ignore malformed storage
+    }
+    try {
+      const storedWidths = localStorage.getItem(WIDTH_STORAGE_KEY);
+      if (storedWidths) setColWidths(JSON.parse(storedWidths));
     } catch {
       // ignore malformed storage
     }
@@ -84,7 +95,6 @@ export default function TablePage() {
         key: f.id,
         label: f.label,
         type: CUSTOM_TYPE_TO_COLUMN_TYPE[f.type] ?? "text",
-        width: CUSTOM_TYPE_WIDTH[f.type] ?? "w-40",
         fieldId: f.id,
       })),
     [fields]
@@ -108,9 +118,44 @@ export default function TablePage() {
     return (school[col.key as keyof School] as string) ?? "";
   }
 
+  function sortValue(school: School, col: ColumnDef): string {
+    const raw = getValue(school, col);
+    if (col.type === "daterange") {
+      const { start, end } = parseDateRangeValue(raw);
+      return start ?? end ?? "";
+    }
+    return raw;
+  }
+
+  function widthFor(key: string, type: ColumnType): number {
+    return colWidths[key] ?? DEFAULT_WIDTH[type];
+  }
+
+  function startResize(e: React.MouseEvent, col: ColumnDef) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = widthFor(col.key, col.type);
+
+    function onMove(ev: MouseEvent) {
+      const next = Math.max(MIN_WIDTH, startWidth + (ev.clientX - startX));
+      setColWidths((w) => ({ ...w, [col.key]: next }));
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      setColWidths((w) => {
+        localStorage.setItem(WIDTH_STORAGE_KEY, JSON.stringify(w));
+        return w;
+      });
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
   function persistHidden(next: Set<string>) {
     setHidden(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+    localStorage.setItem(HIDDEN_STORAGE_KEY, JSON.stringify([...next]));
   }
 
   function toggleColumn(key: string) {
@@ -149,8 +194,8 @@ export default function TablePage() {
     if (!col) return schools;
     const copy = [...schools];
     copy.sort((a, b) => {
-      const av = getValue(a, col);
-      const bv = getValue(b, col);
+      const av = sortValue(a, col);
+      const bv = sortValue(b, col);
       if (!av && !bv) return 0;
       if (!av) return 1;
       if (!bv) return -1;
@@ -169,7 +214,8 @@ export default function TablePage() {
         <div>
           <h1 className="text-xl font-semibold">Table</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            Pick fields to compare across every school. Click a column header to sort.
+            Pick fields to compare across every school. Click a column header to
+            sort, drag its right edge to resize.
           </p>
         </div>
         <div className="relative" ref={pickerRef}>
@@ -252,19 +298,20 @@ export default function TablePage() {
         <div className="text-sm text-zinc-500">Loading…</div>
       ) : (
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-auto max-h-[75vh]">
-          <table className="border-collapse text-sm">
+          <table className="border-collapse text-sm table-fixed">
             <thead>
               <tr>
-                <th className="sticky top-0 left-0 z-20 bg-zinc-50 dark:bg-zinc-900 border-b border-r border-zinc-200 dark:border-zinc-800 px-3 py-2 text-left font-medium min-w-56 w-56">
+                <th className="sticky top-0 left-0 z-20 bg-zinc-50 dark:bg-zinc-900 border-b border-r border-zinc-200 dark:border-zinc-800 px-3 py-2 text-left font-medium w-56">
                   School
                 </th>
                 {activeColumns.map((c) => (
                   <th
                     key={c.key}
                     onClick={() => toggleSort(c.key)}
-                    className={`sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 text-left font-medium cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800 ${c.width}`}
+                    style={{ width: widthFor(c.key, c.type) }}
+                    className="relative sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 text-left font-medium cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   >
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 truncate">
                       {c.label}
                       {sort?.key === c.key && (
                         <span className="text-zinc-400">
@@ -272,6 +319,12 @@ export default function TablePage() {
                         </span>
                       )}
                     </span>
+                    <div
+                      onMouseDown={(e) => startResize(e, c)}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Drag to resize"
+                      className="absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-zinc-300 dark:hover:bg-zinc-700"
+                    />
                   </th>
                 ))}
               </tr>
@@ -282,7 +335,7 @@ export default function TablePage() {
                   key={school.id}
                   className="border-b border-zinc-100 dark:border-zinc-900 last:border-b-0"
                 >
-                  <td className="sticky left-0 z-10 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 px-3 py-2 align-top min-w-56 w-56">
+                  <td className="sticky left-0 z-10 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 px-3 py-2 align-top w-56">
                     <Link
                       href={`/schools/${school.id}`}
                       className="font-medium hover:underline"
@@ -296,6 +349,7 @@ export default function TablePage() {
                       school={school}
                       column={c}
                       value={getValue(school, c)}
+                      width={widthFor(c.key, c.type)}
                     />
                   ))}
                 </tr>
@@ -312,13 +366,16 @@ function Cell({
   school,
   column,
   value,
+  width,
 }: {
   school: School;
   column: ColumnDef;
   value: string;
+  width: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  const style = { width };
 
   function startEdit() {
     setDraft(value);
@@ -355,7 +412,7 @@ function Cell({
 
   if (column.type === "status") {
     return (
-      <td className={`px-2 py-1.5 align-top ${column.width}`}>
+      <td className="px-2 py-1.5 align-top" style={style}>
         <select
           value={school.status}
           onChange={(e) => commit(e.target.value)}
@@ -373,7 +430,7 @@ function Cell({
 
   if (column.type === "date") {
     return (
-      <td className={`px-2 py-1.5 align-top ${column.width}`}>
+      <td className="px-2 py-1.5 align-top" style={style}>
         <input
           type="date"
           value={value ? value.slice(0, 10) : ""}
@@ -384,10 +441,37 @@ function Cell({
     );
   }
 
+  if (column.type === "daterange") {
+    const range = parseDateRangeValue(value);
+    return (
+      <td className="px-2 py-1.5 align-top" style={style}>
+        <div className="flex items-center gap-1">
+          <input
+            type="date"
+            value={range.start ?? ""}
+            onChange={(e) =>
+              commit(serializeDateRangeValue({ ...range, start: e.target.value }) ?? "")
+            }
+            className="bg-transparent text-xs w-full min-w-0 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 rounded px-1 py-0.5"
+          />
+          <span className="text-zinc-400 text-xs shrink-0">–</span>
+          <input
+            type="date"
+            value={range.end ?? ""}
+            onChange={(e) =>
+              commit(serializeDateRangeValue({ ...range, end: e.target.value }) ?? "")
+            }
+            className="bg-transparent text-xs w-full min-w-0 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 rounded px-1 py-0.5"
+          />
+        </div>
+      </td>
+    );
+  }
+
   if (editing) {
     if (column.type === "longtext") {
       return (
-        <td className={`p-0 align-top ${column.width}`}>
+        <td className="p-0 align-top" style={style}>
           <textarea
             autoFocus
             value={draft}
@@ -403,7 +487,7 @@ function Cell({
       );
     }
     return (
-      <td className={`p-0 align-top ${column.width}`}>
+      <td className="p-0 align-top" style={style}>
         <input
           autoFocus
           value={draft}
@@ -423,7 +507,8 @@ function Cell({
     return (
       <td
         onClick={startEdit}
-        className={`px-3 py-2 align-top cursor-text ${column.width}`}
+        className="px-3 py-2 align-top cursor-text"
+        style={style}
       >
         {value ? (
           <a
@@ -431,7 +516,7 @@ function Cell({
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-blue-600 dark:text-blue-400 hover:underline truncate block"
+            className="text-blue-600 dark:text-blue-400 hover:underline break-all"
           >
             {value}
           </a>
@@ -445,8 +530,8 @@ function Cell({
   return (
     <td
       onClick={startEdit}
-      title={value}
-      className={`px-3 py-2 align-top cursor-text truncate ${column.width}`}
+      className="px-3 py-2 align-top cursor-text whitespace-pre-wrap break-words"
+      style={style}
     >
       {value ? value : <span className="text-zinc-300 dark:text-zinc-700">—</span>}
     </td>

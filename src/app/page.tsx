@@ -96,7 +96,11 @@ export default function DashboardPage() {
                       <span className="font-medium">{d.schoolName}</span>
                       <span className="text-zinc-500"> — {d.type}</span>
                     </span>
-                    <DeadlinePill date={d.date} daysUntil={d.daysUntil} />
+                    <DeadlinePill
+                      date={d.date}
+                      daysUntil={d.daysUntil}
+                      variant={d.kind === "window-start" ? "opens" : "due"}
+                    />
                   </Link>
                 </li>
               ))}

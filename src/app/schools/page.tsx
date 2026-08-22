@@ -98,7 +98,11 @@ export default function SchoolsPage() {
                   {deadlines.map((d) => (
                     <span key={d.type} className="inline-flex items-center gap-1">
                       <span className="text-[10px] text-zinc-400">{d.type}</span>
-                      <DeadlinePill date={d.date} daysUntil={d.daysUntil} />
+                      <DeadlinePill
+                        date={d.date}
+                        daysUntil={d.daysUntil}
+                        variant={d.kind === "window-start" ? "opens" : "due"}
+                      />
                     </span>
                   ))}
                   {deadlines.length === 0 && (

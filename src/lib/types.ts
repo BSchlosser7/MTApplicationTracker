@@ -54,13 +54,14 @@ export interface ActivityRow {
   createdAt: string;
 }
 
-export const CUSTOM_FIELD_TYPES = ["text", "longtext", "date", "url"] as const;
+export const CUSTOM_FIELD_TYPES = ["text", "longtext", "date", "daterange", "url"] as const;
 export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number];
 
 export const CUSTOM_FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   text: "Text",
   longtext: "Long Text",
   date: "Date",
+  daterange: "Date Window",
   url: "Link",
 };
 

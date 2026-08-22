@@ -132,9 +132,11 @@ export default function CalendarPage() {
                         href={`/schools/${d.schoolId}`}
                         title={`${d.schoolName} — ${d.type}`}
                         className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate ${
-                          d.type === "Application"
-                            ? "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
-                            : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                          d.kind === "window-start"
+                            ? "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300"
+                            : d.kind === "window-end"
+                              ? "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
+                              : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
                         }`}
                       >
                         {d.schoolName}
@@ -161,7 +163,11 @@ export default function CalendarPage() {
                   <span className="font-medium">{d.schoolName}</span>
                   <span className="text-zinc-500"> — {d.type}</span>
                 </span>
-                <DeadlinePill date={d.date} daysUntil={d.daysUntil} />
+                <DeadlinePill
+                  date={d.date}
+                  daysUntil={d.daysUntil}
+                  variant={d.kind === "window-start" ? "opens" : "due"}
+                />
               </Link>
             ))
           )}

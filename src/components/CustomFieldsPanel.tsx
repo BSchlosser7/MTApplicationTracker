@@ -5,6 +5,7 @@ import useSWR, { mutate } from "swr";
 import type { CustomField, CustomFieldValue } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import AddFieldForm from "@/components/AddFieldForm";
+import { parseDateRangeValue, serializeDateRangeValue } from "@/lib/dateRange";
 
 export default function CustomFieldsPanel({ schoolId }: { schoolId: string }) {
   const fieldsKey = "/api/fields";
@@ -86,15 +87,23 @@ function FieldInput({
 }) {
   const [draft, setDraft] = useState(value);
 
-  async function commit() {
-    if (draft === value) return;
+  async function commit(next?: string) {
+    const nextValue = next ?? draft;
+    if (nextValue === value) return;
     await fetch("/api/field-values", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ schoolId, fieldId: field.id, value: draft }),
+      body: JSON.stringify({ schoolId, fieldId: field.id, value: nextValue }),
     });
     mutate(valuesKey);
     mutate("/api/field-values");
+  }
+
+  async function commitRange(patch: { start?: string; end?: string }) {
+    const range = parseDateRangeValue(value);
+    const next = serializeDateRangeValue({ ...range, ...patch }) ?? "";
+    setDraft(next);
+    await commit(next);
   }
 
   return (
@@ -110,11 +119,27 @@ function FieldInput({
           ×
         </button>
       </span>
-      {field.type === "longtext" ? (
+      {field.type === "daterange" ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={parseDateRangeValue(value).start ?? ""}
+            onChange={(e) => commitRange({ start: e.target.value })}
+            className="flex-1 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
+          />
+          <span className="text-xs text-zinc-400">to</span>
+          <input
+            type="date"
+            value={parseDateRangeValue(value).end ?? ""}
+            onChange={(e) => commitRange({ end: e.target.value })}
+            className="flex-1 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
+          />
+        </div>
+      ) : field.type === "longtext" ? (
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
+          onBlur={() => commit()}
           rows={3}
           className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm resize-y"
         />
@@ -123,7 +148,7 @@ function FieldInput({
           type={field.type === "date" ? "date" : field.type === "url" ? "url" : "text"}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
+          onBlur={() => commit()}
           className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
         />
       )}
