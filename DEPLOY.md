@@ -58,6 +58,11 @@ step 1.4 instead and skip this.
    Paste in the same two values from step 1.5 when prompted. Repeat with
    `preview` and `development` instead of `production` if you want preview
    deployments to work too.
+   Optionally also add a shared password so randoms with the URL can't get
+   in:
+   ```bash
+   npx vercel env add SITE_PASSWORD production
+   ```
 4. Deploy for real:
    ```bash
    npx vercel --prod
