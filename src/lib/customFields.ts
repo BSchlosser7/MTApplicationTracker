@@ -85,6 +85,15 @@ export async function deleteField(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function reorderFields(orderedIds: string[]): Promise<CustomField[]> {
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from("custom_fields").update({ sort_order: index }).eq("id", id)
+    )
+  );
+  return listFields();
+}
+
 export async function listAllValues(): Promise<CustomFieldValue[]> {
   const { data, error } = await supabase.from("custom_field_values").select("*");
   if (error) throw error;

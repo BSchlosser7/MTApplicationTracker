@@ -2,6 +2,23 @@
 
 import { useState } from "react";
 import useSWR, { mutate } from "swr";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { CustomField, CustomFieldValue } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import AddFieldForm from "@/components/AddFieldForm";
@@ -14,6 +31,10 @@ export default function CustomFieldsPanel({ schoolId }: { schoolId: string }) {
   const { data: values } = useSWR<CustomFieldValue[]>(valuesKey, fetcher);
 
   const [adding, setAdding] = useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   if (!fields || !values) {
     return <p className="text-sm text-zinc-500">Loading…</p>;
@@ -31,6 +52,23 @@ export default function CustomFieldsPanel({ schoolId }: { schoolId: string }) {
     mutate("/api/field-values");
   }
 
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!fields || !over || active.id === over.id) return;
+    const oldIndex = fields.findIndex((f) => f.id === active.id);
+    const newIndex = fields.findIndex((f) => f.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(fields, oldIndex, newIndex);
+    mutate(fieldsKey, reordered, false);
+    await fetch("/api/fields/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds: reordered.map((f) => f.id) }),
+    });
+    mutate(fieldsKey);
+  }
+
   return (
     <div className="space-y-4">
       {fields.length === 0 && !adding && (
@@ -41,18 +79,26 @@ export default function CustomFieldsPanel({ schoolId }: { schoolId: string }) {
       )}
 
       {fields.length > 0 && (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {fields.map((field) => (
-            <FieldInput
-              key={field.id}
-              field={field}
-              value={valueMap.get(field.id) ?? ""}
-              schoolId={schoolId}
-              valuesKey={valuesKey}
-              onDelete={() => handleDelete(field.id, field.label)}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={fields.map((f) => f.id)} strategy={rectSortingStrategy}>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {fields.map((field) => (
+                <FieldInput
+                  key={field.id}
+                  field={field}
+                  value={valueMap.get(field.id) ?? ""}
+                  schoolId={schoolId}
+                  valuesKey={valuesKey}
+                  onDelete={() => handleDelete(field.id, field.label)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {adding ? (
@@ -87,6 +133,13 @@ function FieldInput({
 }) {
   const [draft, setDraft] = useState(value);
   const [labelDraft, setLabelDraft] = useState(field.label);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: field.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   async function commit(next?: string) {
     const nextValue = next ?? draft;
@@ -123,21 +176,36 @@ function FieldInput({
   }
 
   return (
-    <label className="block">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? "relative z-10 opacity-50" : "relative"}
+    >
       <span className="flex items-center justify-between gap-2 mb-1">
-        <input
-          value={labelDraft}
-          onChange={(e) => setLabelDraft(e.target.value)}
-          onBlur={commitLabel}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-            if (e.key === "Escape") {
-              setLabelDraft(field.label);
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-          className="text-xs font-medium text-zinc-500 bg-transparent flex-1 min-w-0 rounded px-1 -mx-1 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 focus:text-zinc-900 dark:focus:text-white"
-        />
+        <span className="flex items-center gap-1 flex-1 min-w-0">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="shrink-0 touch-none cursor-grab text-zinc-300 hover:text-zinc-500 active:cursor-grabbing dark:text-zinc-700 dark:hover:text-zinc-400"
+            title="Drag to reorder"
+          >
+            ⠿
+          </button>
+          <input
+            value={labelDraft}
+            onChange={(e) => setLabelDraft(e.target.value)}
+            onBlur={commitLabel}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              if (e.key === "Escape") {
+                setLabelDraft(field.label);
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            className="min-w-0 flex-1 rounded bg-transparent px-1 -mx-1 text-xs font-medium text-zinc-500 focus:text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:text-white dark:focus:ring-zinc-700"
+          />
+        </span>
         <button
           type="button"
           onClick={onDelete}
@@ -180,6 +248,6 @@ function FieldInput({
           className="w-full px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
         />
       )}
-    </label>
+    </div>
   );
 }
