@@ -86,6 +86,7 @@ function FieldInput({
   onDelete: () => void;
 }) {
   const [draft, setDraft] = useState(value);
+  const [labelDraft, setLabelDraft] = useState(field.label);
 
   async function commit(next?: string) {
     const nextValue = next ?? draft;
@@ -99,6 +100,21 @@ function FieldInput({
     mutate("/api/field-values");
   }
 
+  async function commitLabel() {
+    const trimmed = labelDraft.trim();
+    if (!trimmed) {
+      setLabelDraft(field.label);
+      return;
+    }
+    if (trimmed === field.label) return;
+    await fetch(`/api/fields/${field.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: trimmed }),
+    });
+    mutate("/api/fields");
+  }
+
   async function commitRange(patch: { start?: string; end?: string }) {
     const range = parseDateRangeValue(value);
     const next = serializeDateRangeValue({ ...range, ...patch }) ?? "";
@@ -109,7 +125,19 @@ function FieldInput({
   return (
     <label className="block">
       <span className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-xs font-medium text-zinc-500">{field.label}</span>
+        <input
+          value={labelDraft}
+          onChange={(e) => setLabelDraft(e.target.value)}
+          onBlur={commitLabel}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") {
+              setLabelDraft(field.label);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          className="text-xs font-medium text-zinc-500 bg-transparent flex-1 min-w-0 rounded px-1 -mx-1 focus:outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 focus:text-zinc-900 dark:focus:text-white"
+        />
         <button
           type="button"
           onClick={onDelete}
