@@ -63,6 +63,11 @@ step 1.4 instead and skip this.
    ```bash
    npx vercel env add SITE_PASSWORD production
    ```
+   To make the Chat page work on the deployed site, add your Anthropic API
+   key too:
+   ```bash
+   npx vercel env add ANTHROPIC_API_KEY production
+   ```
 4. Deploy for real:
    ```bash
    npx vercel --prod

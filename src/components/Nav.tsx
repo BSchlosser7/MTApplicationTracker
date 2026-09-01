@@ -9,6 +9,7 @@ const links = [
   { href: "/calendar", label: "Calendar" },
   { href: "/schools", label: "Schools" },
   { href: "/table", label: "Table" },
+  { href: "/chat", label: "Chat" },
 ];
 
 export default function Nav() {
