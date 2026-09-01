@@ -70,6 +70,14 @@ export interface CustomField {
   label: string;
   type: CustomFieldType;
   sortOrder: number;
+  groupId: string | null;
+  createdAt: string;
+}
+
+export interface FieldGroup {
+  id: string;
+  name: string;
+  sortOrder: number;
   createdAt: string;
 }
 

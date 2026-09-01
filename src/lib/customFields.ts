@@ -6,6 +6,7 @@ interface FieldRow {
   label: string;
   type: string;
   sort_order: number;
+  group_id: string | null;
   created_at: string;
 }
 
@@ -22,6 +23,7 @@ function mapField(row: FieldRow): CustomField {
     label: row.label,
     type: row.type as CustomFieldType,
     sortOrder: row.sort_order,
+    groupId: row.group_id,
     createdAt: row.created_at,
   };
 }
@@ -38,11 +40,17 @@ function mapValue(row: ValueRow): CustomFieldValue {
 export async function listFields(): Promise<CustomField[]> {
   const { data, error } = await supabase
     .from("custom_fields")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
+    .select("*, field_groups(sort_order)");
   if (error) throw error;
-  return (data as FieldRow[]).map(mapField);
+
+  const rows = data as (FieldRow & { field_groups: { sort_order: number } | null })[];
+  rows.sort((a, b) => {
+    const groupA = a.field_groups?.sort_order ?? Number.POSITIVE_INFINITY;
+    const groupB = b.field_groups?.sort_order ?? Number.POSITIVE_INFINITY;
+    if (groupA !== groupB) return groupA - groupB;
+    return a.sort_order - b.sort_order;
+  });
+  return rows.map(mapField);
 }
 
 export async function createField(
@@ -66,13 +74,18 @@ export async function createField(
   return mapField(data as FieldRow);
 }
 
-export async function renameField(
+export async function updateField(
   id: string,
-  label: string
+  patch: { label?: string; groupId?: string | null }
 ): Promise<CustomField | undefined> {
+  const update: Record<string, unknown> = {};
+  if (patch.label !== undefined) update.label = patch.label;
+  if (patch.groupId !== undefined) update.group_id = patch.groupId;
+  if (Object.keys(update).length === 0) return undefined;
+
   const { data, error } = await supabase
     .from("custom_fields")
-    .update({ label })
+    .update(update)
     .eq("id", id)
     .select()
     .maybeSingle();
@@ -85,11 +98,16 @@ export async function deleteField(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function reorderFields(orderedIds: string[]): Promise<CustomField[]> {
+export async function reorderFields(
+  orderedIds: string[],
+  groupId?: string | null
+): Promise<CustomField[]> {
   await Promise.all(
-    orderedIds.map((id, index) =>
-      supabase.from("custom_fields").update({ sort_order: index }).eq("id", id)
-    )
+    orderedIds.map((id, index) => {
+      const update: Record<string, unknown> = { sort_order: index };
+      if (groupId !== undefined) update.group_id = groupId;
+      return supabase.from("custom_fields").update(update).eq("id", id);
+    })
   );
   return listFields();
 }

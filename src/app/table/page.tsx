@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR, { mutate } from "swr";
-import type { School, CustomField, CustomFieldValue } from "@/lib/types";
+import type { School, CustomField, CustomFieldValue, FieldGroup } from "@/lib/types";
 import { STATUS_OPTIONS } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import AddFieldForm from "@/components/AddFieldForm";
@@ -16,6 +16,7 @@ interface ColumnDef {
   label: string;
   type: ColumnType;
   fieldId?: string;
+  groupId?: string | null;
 }
 
 const STATUS_COLUMN: ColumnDef = {
@@ -41,6 +42,7 @@ const DEFAULT_WIDTH: Record<ColumnType, number> = {
   longtext: 288,
 };
 
+const UNGROUPED = "__ungrouped__";
 const MIN_WIDTH = 90;
 const HIDDEN_STORAGE_KEY = "mt-tracker-table-hidden-columns";
 const WIDTH_STORAGE_KEY = "mt-tracker-table-column-widths";
@@ -48,6 +50,7 @@ const WIDTH_STORAGE_KEY = "mt-tracker-table-column-widths";
 export default function TablePage() {
   const { data: schools, isLoading } = useSWR<School[]>("/api/schools", fetcher);
   const { data: fields } = useSWR<CustomField[]>("/api/fields", fetcher);
+  const { data: groups } = useSWR<FieldGroup[]>("/api/field-groups", fetcher);
   const { data: fieldValues } = useSWR<CustomFieldValue[]>(
     "/api/field-values",
     fetcher
@@ -96,9 +99,21 @@ export default function TablePage() {
         label: f.label,
         type: CUSTOM_TYPE_TO_COLUMN_TYPE[f.type] ?? "text",
         fieldId: f.id,
+        groupId: f.groupId,
       })),
     [fields]
   );
+
+  const columnsByGroup = useMemo(() => {
+    const m = new Map<string, ColumnDef[]>();
+    for (const c of customColumns) {
+      const key = c.groupId ?? UNGROUPED;
+      const arr = m.get(key) ?? [];
+      arr.push(c);
+      m.set(key, arr);
+    }
+    return m;
+  }, [customColumns]);
 
   const allColumns = useMemo(
     () => [STATUS_COLUMN, ...customColumns],
@@ -251,28 +266,44 @@ export default function TablePage() {
                 />
                 {STATUS_COLUMN.label}
               </label>
-              {customColumns.map((c) => (
-                <div
-                  key={c.key}
-                  className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
-                >
-                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
-                    <input
-                      type="checkbox"
+              {(groups ?? []).map((g) => {
+                const cols = columnsByGroup.get(g.id) ?? [];
+                if (cols.length === 0) return null;
+                return (
+                  <div key={g.id}>
+                    <div className="px-3 pt-2 pb-1 text-xs font-semibold text-zinc-400">
+                      {g.name}
+                    </div>
+                    {cols.map((c) => (
+                      <ColumnPickerRow
+                        key={c.key}
+                        column={c}
+                        checked={!hidden.has(c.key)}
+                        onToggle={() => toggleColumn(c.key)}
+                        onDelete={() => handleDeleteField(c.fieldId!, c.label)}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+              {(columnsByGroup.get(UNGROUPED) ?? []).length > 0 && (
+                <div>
+                  {(groups ?? []).length > 0 && (
+                    <div className="px-3 pt-2 pb-1 text-xs font-semibold text-zinc-400">
+                      Ungrouped
+                    </div>
+                  )}
+                  {(columnsByGroup.get(UNGROUPED) ?? []).map((c) => (
+                    <ColumnPickerRow
+                      key={c.key}
+                      column={c}
                       checked={!hidden.has(c.key)}
-                      onChange={() => toggleColumn(c.key)}
+                      onToggle={() => toggleColumn(c.key)}
+                      onDelete={() => handleDeleteField(c.fieldId!, c.label)}
                     />
-                    <span className="truncate">{c.label}</span>
-                  </label>
-                  <button
-                    onClick={() => handleDeleteField(c.fieldId!, c.label)}
-                    className="text-zinc-300 hover:text-red-600 dark:text-zinc-700 dark:hover:text-red-400 shrink-0"
-                    title="Delete field"
-                  >
-                    ×
-                  </button>
+                  ))}
                 </div>
-              ))}
+              )}
 
               <div className="px-3 pt-2 mt-1 border-t border-zinc-100 dark:border-zinc-900">
                 {addingField ? (
@@ -358,6 +389,34 @@ export default function TablePage() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function ColumnPickerRow({
+  column,
+  checked,
+  onToggle,
+  onDelete,
+}: {
+  column: ColumnDef;
+  checked: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
+      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+        <input type="checkbox" checked={checked} onChange={onToggle} />
+        <span className="truncate">{column.label}</span>
+      </label>
+      <button
+        onClick={onDelete}
+        className="text-zinc-300 hover:text-red-600 dark:text-zinc-700 dark:hover:text-red-400 shrink-0"
+        title="Delete field"
+      >
+        ×
+      </button>
     </div>
   );
 }

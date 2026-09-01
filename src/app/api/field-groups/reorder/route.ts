@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { reorderFields } from "@/lib/customFields";
+import { reorderGroups } from "@/lib/fieldGroups";
 
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
@@ -7,8 +7,6 @@ export async function PATCH(req: NextRequest) {
   if (!orderedIds || orderedIds.some((id: unknown) => typeof id !== "string")) {
     return NextResponse.json({ error: "orderedIds must be a string array" }, { status: 400 });
   }
-  const groupId: string | null | undefined =
-    "groupId" in body ? (body.groupId === null ? null : String(body.groupId)) : undefined;
-  const fields = await reorderFields(orderedIds, groupId);
-  return NextResponse.json(fields);
+  const groups = await reorderGroups(orderedIds);
+  return NextResponse.json(groups);
 }
