@@ -81,6 +81,15 @@ export interface FieldGroup {
   createdAt: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  note: string | null;
+  schoolId: string | null;
+  createdAt: string;
+}
+
 export interface CustomFieldValue {
   schoolId: string;
   fieldId: string;

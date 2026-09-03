@@ -68,11 +68,22 @@ create table if not exists custom_field_values (
   primary key (school_id, field_id)
 );
 
+create table if not exists calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  date date not null,
+  note text,
+  school_id uuid references schools(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_documents_school on documents(school_id);
 create index if not exists idx_activity_school on activity_log(school_id);
 create index if not exists idx_field_values_school on custom_field_values(school_id);
 create index if not exists idx_field_values_field on custom_field_values(field_id);
 create index if not exists idx_custom_fields_group on custom_fields(group_id);
+create index if not exists idx_calendar_events_date on calendar_events(date);
+create index if not exists idx_calendar_events_school on calendar_events(school_id);
 
 alter table schools enable row level security;
 alter table documents enable row level security;
@@ -80,6 +91,7 @@ alter table activity_log enable row level security;
 alter table custom_fields enable row level security;
 alter table custom_field_values enable row level security;
 alter table field_groups enable row level security;
+alter table calendar_events enable row level security;
 
 -- Storage bucket for uploaded documents (essays, videos, headshots, etc.).
 -- Private bucket — files are only ever read/written via the service_role key
