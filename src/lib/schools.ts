@@ -6,6 +6,8 @@ interface SchoolRow {
   name: string;
   status: string;
   sort_order: number;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -15,6 +17,8 @@ const COLUMN_MAP: Record<keyof School, keyof SchoolRow | null> = {
   name: "name",
   status: "status",
   sortOrder: "sort_order",
+  latitude: "latitude",
+  longitude: "longitude",
   createdAt: "created_at",
   updatedAt: "updated_at",
 };
@@ -25,6 +29,8 @@ function mapRow(row: SchoolRow): School {
     name: row.name,
     status: row.status as School["status"],
     sortOrder: row.sort_order,
+    latitude: row.latitude,
+    longitude: row.longitude,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -72,7 +78,7 @@ export async function createSchool(data: Partial<School>): Promise<School> {
   return mapRow(row as SchoolRow);
 }
 
-const EDITABLE_FIELDS: (keyof School)[] = ["name", "status"];
+const EDITABLE_FIELDS: (keyof School)[] = ["name", "status", "latitude", "longitude"];
 
 export async function updateSchool(
   id: string,

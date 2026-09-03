@@ -14,6 +14,9 @@ create table if not exists schools (
   name text not null,
   status text not null default 'Not Started',
   sort_order integer not null default 0,
+  -- Geocoded from the school's name for the Map view; null until located.
+  latitude double precision,
+  longitude double precision,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

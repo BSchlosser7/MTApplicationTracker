@@ -28,6 +28,8 @@ export interface School {
   name: string;
   status: Status;
   sortOrder: number;
+  latitude: number | null;
+  longitude: number | null;
   createdAt: string;
   updatedAt: string;
 }
