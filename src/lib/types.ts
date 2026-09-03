@@ -41,6 +41,18 @@ export interface DocumentRow {
   mimeType: string | null;
   size: number;
   note: string | null;
+  libraryDocumentId: string | null;
+  uploadedAt: string;
+}
+
+export interface LibraryDocument {
+  id: string;
+  filename: string;
+  category: DocumentCategory;
+  storedName: string;
+  mimeType: string | null;
+  size: number;
+  note: string | null;
   uploadedAt: string;
 }
 

@@ -2,9 +2,11 @@
 
 import { useRef, useState } from "react";
 import useSWR, { mutate } from "swr";
-import type { DocumentRow, DocumentCategory, LibraryDocument } from "@/lib/types";
+import type { LibraryDocument, DocumentCategory } from "@/lib/types";
 import { DOCUMENT_CATEGORIES } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
+
+const libraryKey = "/api/document-library";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -12,19 +14,15 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function DocumentsPanel({
-  schoolId,
-  documents,
-}: {
-  schoolId: string;
-  documents: DocumentRow[];
-}) {
-  const [category, setCategory] = useState<DocumentCategory>("Video");
+export default function DocumentLibraryPage() {
+  const { data: documents, isLoading } = useSWR<LibraryDocument[]>(
+    libraryKey,
+    fetcher
+  );
+  const [category, setCategory] = useState<DocumentCategory>("Essay");
   const [note, setNote] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [attaching, setAttaching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const key = `/api/schools/${schoolId}/documents`;
 
   async function handleUpload(file: File) {
     setUploading(true);
@@ -33,28 +31,46 @@ export default function DocumentsPanel({
     formData.append("category", category);
     if (note.trim()) formData.append("note", note.trim());
 
-    const res = await fetch(key, { method: "POST", body: formData });
+    const res = await fetch(libraryKey, { method: "POST", body: formData });
     setUploading(false);
     if (res.ok) {
       setNote("");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      mutate(key);
+      mutate(libraryKey);
     }
   }
 
   async function handleDelete(docId: string) {
-    if (!confirm("Delete this file?")) return;
-    await fetch(`/api/documents/${docId}`, { method: "DELETE" });
-    mutate(key);
+    if (
+      !confirm(
+        "Delete this file? It will also be removed from every school it's attached to."
+      )
+    ) {
+      return;
+    }
+    await fetch(`/api/document-library/${docId}`, { method: "DELETE" });
+    mutate(libraryKey);
   }
 
-  const grouped = documents.reduce<Record<string, DocumentRow[]>>((acc, d) => {
-    (acc[d.category] ??= []).push(d);
-    return acc;
-  }, {});
+  const grouped = (documents ?? []).reduce<Record<string, LibraryDocument[]>>(
+    (acc, d) => {
+      (acc[d.category] ??= []).push(d);
+      return acc;
+    },
+    {}
+  );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">Documents</h1>
+        <p className="text-sm text-zinc-500 mt-1">
+          Upload files here once, then attach them to any school from that
+          school&apos;s Documents section — no need to upload the same file
+          twice.
+        </p>
+      </div>
+
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <select
@@ -71,7 +87,7 @@ export default function DocumentsPanel({
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional note (e.g. 'song cut for CMU')"
+            placeholder="Optional note (e.g. 'Common App main essay')"
             className="flex-1 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
           />
         </div>
@@ -86,24 +102,12 @@ export default function DocumentsPanel({
           className="text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-zinc-900 file:text-white dark:file:bg-white dark:file:text-zinc-900 file:text-sm file:font-medium file:cursor-pointer cursor-pointer"
         />
         {uploading && <p className="text-xs text-zinc-500">Uploading…</p>}
-        {attaching ? (
-          <AttachFromLibrary
-            schoolId={schoolId}
-            documentsKey={key}
-            onDone={() => setAttaching(false)}
-          />
-        ) : (
-          <button
-            onClick={() => setAttaching(true)}
-            className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:underline"
-          >
-            + Attach from Library
-          </button>
-        )}
       </div>
 
-      {documents.length === 0 ? (
-        <p className="text-sm text-zinc-500">No documents uploaded yet.</p>
+      {isLoading ? (
+        <p className="text-sm text-zinc-500">Loading…</p>
+      ) : !documents || documents.length === 0 ? (
+        <p className="text-sm text-zinc-500">No documents in the library yet.</p>
       ) : (
         <div className="space-y-4">
           {Object.entries(grouped).map(([cat, docs]) => (
@@ -119,20 +123,19 @@ export default function DocumentsPanel({
                   >
                     <div className="min-w-0">
                       <a
-                        href={`/api/documents/${d.id}`}
+                        href={`/api/document-library/${d.id}`}
                         className="font-medium hover:underline truncate block"
                       >
                         {d.filename}
                       </a>
                       <div className="text-xs text-zinc-500">
                         {formatSize(d.size)}
-                        {d.libraryDocumentId ? " — from library" : ""}
                         {d.note ? ` — ${d.note}` : ""}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <a
-                        href={`/api/documents/${d.id}`}
+                        href={`/api/document-library/${d.id}`}
                         className="text-xs text-zinc-500 hover:underline"
                       >
                         Download
@@ -152,86 +155,5 @@ export default function DocumentsPanel({
         </div>
       )}
     </div>
-  );
-}
-
-function AttachFromLibrary({
-  schoolId,
-  documentsKey,
-  onDone,
-}: {
-  schoolId: string;
-  documentsKey: string;
-  onDone: () => void;
-}) {
-  const { data: library } = useSWR<LibraryDocument[]>(
-    "/api/document-library",
-    fetcher
-  );
-  const [libraryDocumentId, setLibraryDocumentId] = useState("");
-  const [note, setNote] = useState("");
-  const [attaching, setAttaching] = useState(false);
-
-  async function handleAttach(e: React.FormEvent) {
-    e.preventDefault();
-    if (!libraryDocumentId) return;
-    setAttaching(true);
-    await fetch(`/api/schools/${schoolId}/documents/attach`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        libraryDocumentId,
-        note: note.trim() || undefined,
-      }),
-    });
-    setAttaching(false);
-    mutate(documentsKey);
-    onDone();
-  }
-
-  return (
-    <form
-      onSubmit={handleAttach}
-      className="flex flex-col sm:flex-row gap-2 pt-1"
-    >
-      <select
-        value={libraryDocumentId}
-        onChange={(e) => setLibraryDocumentId(e.target.value)}
-        className="flex-1 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
-      >
-        <option value="">
-          {library && library.length === 0
-            ? "No documents in the library yet"
-            : "Choose a file…"}
-        </option>
-        {(library ?? []).map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.filename} ({d.category})
-          </option>
-        ))}
-      </select>
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Note (optional)"
-        className="flex-1 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
-      />
-      <div className="flex gap-2 shrink-0">
-        <button
-          type="submit"
-          disabled={!libraryDocumentId || attaching}
-          className="px-3 py-2 rounded-md bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-sm font-medium hover:opacity-90 disabled:opacity-40"
-        >
-          Attach
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="px-3 py-2 rounded-md text-sm text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
   );
 }

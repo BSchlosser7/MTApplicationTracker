@@ -29,6 +29,17 @@ create table if not exists field_groups (
   created_at timestamptz not null default now()
 );
 
+create table if not exists document_library (
+  id uuid primary key default gen_random_uuid(),
+  filename text not null,
+  category text not null default 'Other',
+  storage_path text not null,
+  mime_type text,
+  size integer not null default 0,
+  note text,
+  uploaded_at timestamptz not null default now()
+);
+
 create table if not exists documents (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references schools(id) on delete cascade,
@@ -38,6 +49,10 @@ create table if not exists documents (
   mime_type text,
   size integer not null default 0,
   note text,
+  -- Set when this row is a linked copy of a document_library file rather
+  -- than a direct upload. ON DELETE CASCADE: deleting the library file
+  -- removes it from every school it was attached to (same physical file).
+  library_document_id uuid references document_library(id) on delete cascade,
   uploaded_at timestamptz not null default now()
 );
 
@@ -78,6 +93,7 @@ create table if not exists calendar_events (
 );
 
 create index if not exists idx_documents_school on documents(school_id);
+create index if not exists idx_documents_library on documents(library_document_id);
 create index if not exists idx_activity_school on activity_log(school_id);
 create index if not exists idx_field_values_school on custom_field_values(school_id);
 create index if not exists idx_field_values_field on custom_field_values(field_id);
@@ -92,6 +108,7 @@ alter table custom_fields enable row level security;
 alter table custom_field_values enable row level security;
 alter table field_groups enable row level security;
 alter table calendar_events enable row level security;
+alter table document_library enable row level security;
 
 -- Storage bucket for uploaded documents (essays, videos, headshots, etc.).
 -- Private bucket — files are only ever read/written via the service_role key
