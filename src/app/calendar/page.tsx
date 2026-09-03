@@ -226,43 +226,143 @@ export default function CalendarPage() {
                   />
                 </Link>
               ) : (
-                <div
+                <EventListRow
                   key={item.data.id}
-                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
-                >
-                  {item.data.schoolId ? (
-                    <Link href={`/schools/${item.data.schoolId}`} className="hover:underline">
-                      <span className="font-medium">{item.data.title}</span>
-                      {item.data.note && (
-                        <span className="text-zinc-500"> — {item.data.note}</span>
-                      )}
-                    </Link>
-                  ) : (
-                    <span>
-                      <span className="font-medium">{item.data.title}</span>
-                      {item.data.note && (
-                        <span className="text-zinc-500"> — {item.data.note}</span>
-                      )}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                      {format(parseISO(item.data.date), "MMM d")}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteEvent(item.data.id)}
-                      className="text-zinc-300 hover:text-red-600 dark:text-zinc-700 dark:hover:text-red-400"
-                      title="Delete event"
-                    >
-                      ×
-                    </button>
-                  </span>
-                </div>
+                  event={item.data}
+                  schools={schools ?? []}
+                  onDelete={() => handleDeleteEvent(item.data.id)}
+                />
               )
             )
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+type EventField = "title" | "date" | "note";
+
+function EventListRow({
+  event,
+  schools,
+  onDelete,
+}: {
+  event: CalendarEvent;
+  schools: School[];
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState<EventField | null>(null);
+  const [draft, setDraft] = useState("");
+  const schoolName = event.schoolId
+    ? schools.find((s) => s.id === event.schoolId)?.name
+    : null;
+
+  function currentValue(field: EventField): string {
+    if (field === "title") return event.title;
+    if (field === "date") return event.date;
+    return event.note ?? "";
+  }
+
+  function startEdit(field: EventField) {
+    setDraft(currentValue(field));
+    setEditing(field);
+  }
+
+  async function commit() {
+    const field = editing;
+    setEditing(null);
+    if (!field) return;
+    const current = currentValue(field);
+    if (draft === current) return;
+    if ((field === "title" || field === "date") && !draft.trim()) return;
+
+    await fetch(`/api/calendar-events/${event.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: draft }),
+    });
+    mutate(eventsKey);
+  }
+
+  function inputProps() {
+    return {
+      autoFocus: true,
+      value: draft,
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value),
+      onBlur: commit,
+      onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Escape") setEditing(null);
+      },
+    };
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
+      <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+        {editing === "title" ? (
+          <input
+            {...inputProps()}
+            className="font-medium bg-transparent border-b border-zinc-300 dark:border-zinc-700 focus:outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => startEdit("title")}
+            className="font-medium hover:underline text-left"
+          >
+            {event.title}
+          </button>
+        )}
+        {schoolName && (
+          <Link
+            href={`/schools/${event.schoolId}`}
+            className="text-xs text-zinc-400 hover:underline"
+          >
+            {schoolName}
+          </Link>
+        )}
+        {editing === "note" ? (
+          <input
+            {...inputProps()}
+            placeholder="Note"
+            className="text-zinc-500 bg-transparent border-b border-zinc-300 dark:border-zinc-700 focus:outline-none flex-1 min-w-24"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => startEdit("note")}
+            className="text-zinc-500 hover:underline text-left"
+          >
+            {event.note || "+ add note"}
+          </button>
+        )}
+      </div>
+      <span className="flex items-center gap-2 shrink-0">
+        {editing === "date" ? (
+          <input
+            {...inputProps()}
+            type="date"
+            className="text-xs px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => startEdit("date")}
+            className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 hover:opacity-80"
+          >
+            {format(parseISO(event.date), "MMM d")}
+          </button>
+        )}
+        <button
+          onClick={onDelete}
+          className="text-zinc-300 hover:text-red-600 dark:text-zinc-700 dark:hover:text-red-400"
+          title="Delete event"
+        >
+          ×
+        </button>
+      </span>
     </div>
   );
 }
